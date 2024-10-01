@@ -148,24 +148,40 @@ class StudentCourseApp:
             conn.commit()
             messagebox.showinfo("Success", "Student added successfully!")
             self.refresh_assign_dropdowns()  # Refresh dropdowns after adding student
+            self.clear_student_fields()  # Clear input fields after adding student
         except Exception as e:
             messagebox.showerror("Error", f"Error adding student: {e}")
         conn.close()
 
+    def clear_student_fields(self):
+        """Clear the input fields in the Add Student section."""
+        self.student_name_entry.delete(0, tk.END)
+        self.student_email_entry.delete(0, tk.END)
+        self.student_phone_entry.delete(0, tk.END)
+
     def view_students(self):
         conn = sqlite3.connect('school.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM students")
+        cursor.execute("SELECT id, name, phone, email FROM students")
         students = cursor.fetchall()
         conn.close()
 
         view_window = tk.Toplevel(self.root)
         view_window.title("View All Students")
-        view_window.geometry("400x300")
+        view_window.geometry("600x400")
 
+        # Create a table format
+        tree = ttk.Treeview(view_window, columns=('ID', 'Name', 'Phone', 'Email'), show='headings')
+        tree.heading('ID', text='Student ID')
+        tree.heading('Name', text='Name')
+        tree.heading('Phone', text='Contact No')
+        tree.heading('Email', text='Email')
+
+        # Insert student data into the table
         for student in students:
-            student_info = f"ID: {student[0]}, Name: {student[1]}, Email: {student[2]}, Phone: {student[3]}"
-            tk.Label(view_window, text=student_info).pack()
+            tree.insert('', tk.END, values=student)
+
+        tree.pack(expand=True, fill="both")
 
     # CRUD Operations for Courses
     def add_course(self):
@@ -179,24 +195,38 @@ class StudentCourseApp:
             conn.commit()
             messagebox.showinfo("Success", "Course added successfully!")
             self.refresh_assign_dropdowns()  # Refresh dropdowns after adding course
+            self.clear_course_fields()  # Clear input fields after adding course
         except Exception as e:
             messagebox.showerror("Error", f"Error adding course: {e}")
         conn.close()
 
+    def clear_course_fields(self):
+        """Clear the input fields in the Add Course section."""
+        self.course_name_entry.delete(0, tk.END)
+        self.course_description_entry.delete(0, tk.END)
+
     def view_courses(self):
         conn = sqlite3.connect('school.db')
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM courses")
+        cursor.execute("SELECT id, course_name, description FROM courses")
         courses = cursor.fetchall()
         conn.close()
 
         view_window = tk.Toplevel(self.root)
         view_window.title("View All Courses")
-        view_window.geometry("400x300")
+        view_window.geometry("600x400")
 
+        # Create a table format
+        tree = ttk.Treeview(view_window, columns=('ID', 'Course Name', 'Description'), show='headings')
+        tree.heading('ID', text='Course ID')
+        tree.heading('Course Name', text='Course Name')
+        tree.heading('Description', text='Description')
+
+        # Insert course data into the table
         for course in courses:
-            course_info = f"ID: {course[0]}, Name: {course[1]}, Description: {course[2]}"
-            tk.Label(view_window, text=course_info).pack()
+            tree.insert('', tk.END, values=course)
+
+        tree.pack(expand=True, fill="both")
 
     # Assign a student to a course
     def assign_student_to_course(self):
@@ -217,6 +247,13 @@ class StudentCourseApp:
         cursor.execute("SELECT id FROM courses WHERE course_name=?", (course_name,))
         course_id = cursor.fetchone()[0]
 
+        # Check for duplicate assignment
+        cursor.execute("SELECT * FROM student_courses WHERE student_id=? AND course_id=?", (student_id, course_id))
+        if cursor.fetchone():
+            messagebox.showerror("Error", f"{student_name} is already assigned to {course_name}!")
+            conn.close()
+            return
+
         # Add the current date for assignment
         assigned_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -232,20 +269,31 @@ class StudentCourseApp:
     def view_assigned_students(self):
         conn = sqlite3.connect('school.db')
         cursor = conn.cursor()
-        cursor.execute('''SELECT students.name, courses.course_name, student_courses.assigned_date
+        cursor.execute('''SELECT courses.id, courses.course_name, students.id, students.name, student_courses.assigned_date
                           FROM students 
                           JOIN student_courses ON students.id = student_courses.student_id 
-                          JOIN courses ON courses.id = student_courses.course_id''')
+                          JOIN courses ON courses.id = student_courses.course_id
+                          ORDER BY courses.course_name''')
         assigned = cursor.fetchall()
         conn.close()
 
         view_window = tk.Toplevel(self.root)
         view_window.title("View Students with Assigned Courses")
-        view_window.geometry("400x300")
+        view_window.geometry("700x400")
 
+        # Create a table format
+        tree = ttk.Treeview(view_window, columns=('Course ID', 'Course Name', 'Student ID', 'Student Name', 'Assigned Date'), show='headings')
+        tree.heading('Course ID', text='Course ID')
+        tree.heading('Course Name', text='Course Name')
+        tree.heading('Student ID', text='Student ID')
+        tree.heading('Student Name', text='Student Name')
+        tree.heading('Assigned Date', text='Assigned Date')
+
+        # Insert assigned data into the table
         for record in assigned:
-            assigned_info = f"Student: {record[0]}, Course: {record[1]}, Assigned on: {record[2]}"
-            tk.Label(view_window, text=assigned_info).pack()
+            tree.insert('', tk.END, values=record)
+
+        tree.pack(expand=True, fill="both")
 
     # Helper to fetch student names
     def get_students(self):
